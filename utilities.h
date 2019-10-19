@@ -1,6 +1,11 @@
-#IFNDEF _UTILITIES_H_
-#DEFINE _UTILITIES_H_
+#ifndef _UTILITIES_H_
+#define _UTILITIES_H_
 
-char** input_parser(char* str);
+char* rm_spaces(char* str);
 
-#ENDIF
+char** tokenize_input(char *input, int* numArgs);
+
+//used for finding the pipe string position
+int findStrPos(char **strs, int numStrs, char* toFind);
+
+#endif
