@@ -8,6 +8,7 @@
 //#include "readline/readline.h"
 //#include "readline/history.h"
 #include "utilities.h"
+#include <sys/wait.h>
 
 struct Job {
     int pid;
