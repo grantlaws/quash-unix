@@ -51,12 +51,6 @@ void cmdline_exec()
 			directory = getcwd(NULL, 1024);
 		}
 
-		// initialize Prompt
-		//snprintf(prompt, sizeof(prompt), "[%s:%s] > ", user, directory);
-
-		// readline library allows to read in input and display prompt
-		//input = readline(prompt);
-
 		printf("[%s:%s] > ", user, directory);
 		getline(&input, &inputSize, stdin);
 		// if input exists lets run it
@@ -171,8 +165,8 @@ void printJobs() {
 }
 
 void exeCommand(char *input, char **args, int numArgs) {
-    if (*args[numArgs-1] == '&') {
-    	*args[numArgs-1] = 0;
+    if (*args[0] == '&') {
+    	*args[0] = 0;
     	runInBackground(input, args, numArgs);
     }
 		else if (strcmp("set", args[0]) == 0) {
