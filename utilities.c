@@ -53,7 +53,6 @@ char** tokenizeInput(char *input, int* numArgs) {
 
 		temp = strtok(NULL, " =");
 	}
-
 	ret = realloc(ret, sizeof(char*) * (numSpaces+1));
 	ret[numSpaces] = 0;
 

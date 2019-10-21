@@ -31,13 +31,20 @@ static size_t inputSize = 32;
 void cd(char *dir) {
     if (dir == NULL) {
         chdir(getenv("HOME"));
-        directory = getcwd(NULL, 1024);
-    }
-		else {
+	if(directory != NULL){
+		strcpy(directory, getcwd(NULL, 1024));
+	} else {
+        	directory = getcwd(NULL, 1024);
+	}
+    } else {
         if (chdir(dir) == -1) {
-            printf(" %s: Directory does not exist!\n", strerror(errno));
+        	printf(" %s: Directory does not exist!\n", strerror(errno));
         }
-        directory = getcwd(NULL, 1024);
+	if(directory != NULL){
+		strcpy(directory, getcwd(NULL, 1024));
+	} else {
+		directory = getcwd(NULL, 1024);
+	}
     }
 }
 
@@ -52,9 +59,10 @@ void setPath(char **args) {
      if (strcmp(value, getenv(newVar)) == 0) {
         printf("\nNew environment variable '%s' was set to the value '%s' successfully.\n\n", newVar, getenv(newVar));
      } else {
-   		  printf("\nValue for '%s' is already set to '%s'.\nWould you like to reset this environment variable to '%s'?\n> ", newVar, getenv(newVar), value);
-       	//char *temp = readline(" (y/n): ");
+   	 printf("\nValue for '%s' is already set to '%s'.\nWould you like to reset this environment variable to '%s'?\n> ", newVar, getenv(newVar), value);
+       	printf("(y/n): ");
 
+	//THE BELOW DOES NOT WORK
         getline(&input, &inputSize, stdin);
         if (strcasecmp(input, "y") == 0 || strcasecmp(input, "yes") == 0) {
           	setenv(newVar, value, 1);
@@ -213,10 +221,18 @@ int main(int argc, char** argv, char** envp)
 
 		// infinite Loop
     while(1) {
-    		user = getenv("USER");
-        home = getenv("HOME");
-        path = getenv("PATH");
-        directory = getcwd(NULL, 1024);
+	//according to standard 7.20.4.5, getenv can overwrite itself and shouldn't be modified by program
+	user = getenv("USER");
+	home = getenv("HOME");
+	path = getenv("PATH");
+	
+	//Pointer created by getcwd has to be freed	
+	if(directory != NULL){
+		free(directory);
+		directory = getcwd(NULL, 1024);
+	} else {
+		directory = getcwd(NULL, 1024);
+	}
 
         // initialize Prompt
         //snprintf(prompt, sizeof(prompt), "[%s:%s] > ", user, directory);
@@ -240,13 +256,18 @@ int main(int argc, char** argv, char** envp)
 
                 // break out of while loop if first token is "exit" or "quit"
                 if (strcmp("exit", tokens[0]) == 0 || strcmp("quit", tokens[0]) == 0) {
-                    break;
+                	if(directory != NULL){
+				free(directory);
+				free(input);
+				free(tokens);
+			}
+			break;
                 }
 
                 exeCommand(input, tokens, numArgs);
+		free(tokens);
             }
-        }
-			//	free(input);
+     	}
         numArgs = 0;
     }
 
