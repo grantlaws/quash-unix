@@ -4,6 +4,11 @@
 #include <string.h>
 #include <ctype.h>
 
+void exeSigInt(int sig) {
+	printf("\n\nSIGINT signal %i received. Quitting quash.\n\n", sig);
+	exit(0);
+}
+
 char* rm_spaces(char* str) {
     char *endChar;
 
