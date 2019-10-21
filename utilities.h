@@ -3,7 +3,7 @@
 
 char* rm_spaces(char* str);
 
-char** tokenize_input(char *input, int* numArgs);
+char** tokenizeInput(char *input, int* numArgs);
 
 //used for finding the pipe string position
 int findStrPos(char **strs, int numStrs, char* toFind);

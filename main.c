@@ -4,10 +4,9 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
-#include <readline/readline.h>
-#include <readline/history.h>
-#include "cmdline.h"
-#include "redirec.h"
+#include <sys/mman.h>
+//#include "readline/readline.h"
+//#include "readline/history.h"
 #include "utilities.h"
 
 struct Job {
@@ -17,7 +16,7 @@ struct Job {
 };
 
 static struct Job jobs[100];
-static int numJobs = 0;
+static int *numJobs = 0;
 
 static int numArgs = 0;
 
@@ -25,6 +24,8 @@ static char* user;
 static char* directory;
 static char* home;
 static char* path;
+static char* input;
+static size_t inputSize = 32;
 
 void cd(char *dir) {
     if (dir == NULL) {
@@ -50,10 +51,11 @@ void setPath(char **args) {
      if (strcmp(value, getenv(newVar)) == 0) {
         printf("\nNew environment variable '%s' was set to the value '%s' successfully.\n\n", newVar, getenv(newVar));
      } else {
-   		  printf("\nValue for '%s' is already set to '%s'.\nWould you like to reset this environment variable to '%s'?", newVar, getenv(newVar), value);
-       	char *temp = readline(" (y/n): ");
+   		  printf("\nValue for '%s' is already set to '%s'.\nWould you like to reset this environment variable to '%s'?\n> ", newVar, getenv(newVar), value);
+       	//char *temp = readline(" (y/n): ");
 
-        if (strcasecmp(temp, "y") == 0 || strcasecmp(temp, "yes") == 0) {
+        getline(&input, &inputSize, stdin);
+        if (strcasecmp(input, "y") == 0 || strcasecmp(input, "yes") == 0) {
           	setenv(newVar, value, 1);
            	printf("Environment variable '%s' was set to the value '%s' successfully.\n\n", newVar, getenv(newVar));
         } else {
@@ -84,16 +86,89 @@ void externalCommand(char **args) {
 }
 
 void printJobs() {
-    for (int i = 0; i < numJobs; i++) {
+    for (int i = 0; i < *numJobs; i++) {
         if (kill(jobs[i].jid, 0) == 0) {
             printf("\nJob ID: %d\nPID: %d\nCommand: %s\n", jobs[i].pid, jobs[i].jid, jobs[i].cmd);
         }
     }
 }
-// TODO
-void exePipe(char **args, int numArgs) {}
-// TODO
-void runInBackground(char *input, char **args, int numArgs) {}
+
+void exeCommand(char *input, char **args, int numArgs);
+
+void exePipe(char **args, int numArgs) {
+  int pfd[2];
+  char *input = strdup(*args);
+  char *arg1 = strtok(input, "|");
+  char *arg2 = strtok(NULL, "\n");
+
+  int pid;
+
+  pid_t pid_1, pid_2;
+
+  pid_1 = fork();
+  if (pid_1 == 0) {
+    dup2(pfd[1], STDOUT_FILENO);
+    close(pfd[0]);
+    int n = 0;
+    char **tmp = tokenizeInput(arg1, &n);
+    exeCommand(rm_spaces(arg1), tmp, n);
+    exit(0);
+  }
+
+  pid_2 = fork();
+  if (pid_2 == 0) {
+    dup2(pfd[0], STDIN_FILENO);
+    close(pfd[1]);
+    int n = 0;
+    char **tmp = tokenizeInput(arg1, &n);
+    exeCommand(rm_spaces(arg2), tmp, n);
+  }
+
+  close(pfd[0]);
+  close(pfd[1]);
+}
+
+void runInBackground(char *input, char **args, int numArgs) {
+  pid_t pid, sid;
+
+  pid = fork();
+  if (pid == 0) {
+      sid = setsid();
+
+      if (sid < 0) {
+          printf("\nFailed to create child process.\n\n");
+          exit(EXIT_FAILURE);
+      }
+
+      printf("\n[%d] %d is running in the background\n\n", getpid(), *numJobs);
+
+      exeCommand(input, args, numArgs);
+
+      printf("\n[%d] done\n\n", getpid());
+
+      kill(getpid(), -9);
+      exit(0);
+  } else {
+    struct Job newJob = {
+      .pid = pid,
+      .jid = *numJobs,
+      .cmd = input
+    };
+
+      int status;
+
+    jobs[*numJobs] = newJob;
+    *numJobs = *numJobs + 1;
+
+      while(waitpid(pid, NULL, WEXITED|WNOHANG) > 0) {
+      }
+  }
+}
+
+void exeSigInt(int sig) {
+	printf("\n\nSIGINT signal %i received. Quitting quash.\n\n", sig);
+	exit(0);
+}
 
 void exeCommand(char *input, char **args, int numArgs) {
     if (*args[numArgs-1] == '&') {
@@ -119,23 +194,21 @@ void exeCommand(char *input, char **args, int numArgs) {
 
 int main(int argc, char** argv, char** envp)
 {
-	// if(argc == 1) //Command Line
-	// {
-	// 	cmdline_exec();
-	// }
-	// else if(argc > 1) //Read in from file
-	// {
-	// 	redirec_exec();
-	// }
-	// else
-	// {
-	// 	printf("This shouldn't happen.\n");
-	// }
-
-		rl_bind_key('\t', rl_complete);
-    char* input, prompt[128];
-    numJobs = 0;
+		//rl_bind_key('\t', rl_complete);
+    //char* input, prompt[128];
+    numJobs = mmap(NULL, sizeof *numJobs, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *numJobs = 0;
 		numArgs = 0;
+
+    // look if SIGINT signal is received, set handler
+    signal(SIGINT, exeSigInt);
+
+    input = (char *)malloc(inputSize * sizeof(char));
+     if( input == NULL)
+     {
+         perror("Unable to allocate buffer");
+         exit(1);
+     }
 
 		// infinite Loop
     while(1) {
@@ -144,12 +217,14 @@ int main(int argc, char** argv, char** envp)
         path = getenv("PATH");
         directory = getcwd(NULL, 1024);
 
-        // Initialize Prompt
-        snprintf(prompt, sizeof(prompt), "[%s:%s] > ", user, directory);
+        // initialize Prompt
+        //snprintf(prompt, sizeof(prompt), "[%s:%s] > ", user, directory);
 
         // readline library allows to read in input and display prompt
-        input = readline(prompt);
+        //input = readline(prompt);
 
+        printf("[%s:%s] > ", user, directory);
+        getline(&input, &inputSize, stdin);
         // if input exists lets run it
         if (*input) {
             // remove spaces at the front and back of input
@@ -157,10 +232,10 @@ int main(int argc, char** argv, char** envp)
 						//if the input was not only spaces continue
             if (*input) {
                 // add the current input to the history
-                add_history(input);
+              //  add_history(input);
 
                 // tokenize input and place tokens into an array
-                char **tokens = tokenize_input(input, &numArgs);
+                char **tokens = tokenizeInput(input, &numArgs);
 
                 // break out of while loop if first token is "exit" or "quit"
                 if (strcmp("exit", tokens[0]) == 0 || strcmp("quit", tokens[0]) == 0) {
@@ -170,7 +245,7 @@ int main(int argc, char** argv, char** envp)
                 exeCommand(input, tokens, numArgs);
             }
         }
-				free(input);
+			//	free(input);
         numArgs = 0;
     }
 

@@ -29,7 +29,7 @@ char* rm_spaces(char* str) {
     return str;
 }
 
-char** tokenize_input(char *input, int* numArgs) {
+char** tokenizeInput(char *input, int* numArgs) {
 	char **ret = NULL;
 	char *temp = strtok(input, " ");
 	int i, numSpaces = 0;
